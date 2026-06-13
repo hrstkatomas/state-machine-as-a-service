@@ -1,0 +1,19 @@
+{
+  "name": "@flow/flowctl",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "flowctl": "dist/main.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@flow/contracts": "workspace:*",
+    "@flow/sdk": "workspace:*",
+    "commander": "^14.0.0",
+    "esbuild": "^0.25.0"
+  }
+}

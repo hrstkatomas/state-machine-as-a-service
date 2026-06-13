@@ -1,0 +1,17 @@
+{
+  "name": "@flow/runtime-image",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "esbuild src/runner.ts --bundle --platform=node --format=esm --target=node22 --outfile=dist/runner.mjs --banner:js=\"import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);\"",
+    "build:image": "pnpm build && docker build -t platform/flow-runtime:latest ."
+  },
+  "dependencies": {
+    "@flow/contracts": "workspace:*",
+    "@flow/sdk": "workspace:*"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
+  }
+}

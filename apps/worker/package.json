@@ -1,0 +1,23 @@
+{
+  "name": "@flow/worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "dev": "tsx watch src/main.ts",
+    "start": "node dist/main.js"
+  },
+  "dependencies": {
+    "@flow/contracts": "workspace:*",
+    "@flow/engine": "workspace:*",
+    "@flow/sandbox": "workspace:*",
+    "@flow/storage": "workspace:*",
+    "pg": "^8.16.0"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.15.0",
+    "tsx": "^4.20.0"
+  }
+}

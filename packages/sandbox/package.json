@@ -1,0 +1,19 @@
+{
+  "name": "@flow/sandbox",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": { ".": "./dist/index.js" },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@flow/contracts": "workspace:*",
+    "dockerode": "^4.0.6"
+  },
+  "devDependencies": {
+    "@types/dockerode": "^3.3.39"
+  }
+}
