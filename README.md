@@ -84,6 +84,63 @@ Node names accumulate as a string-literal union, so edge targets are compile-tim
   (recorded per-task), but an in-flight node may execute twice — key external side
   effects by `runId:step:node`.
 
+## Architecture
+
+**Build-time dependencies** — who imports whom (arrow = "depends on"). Everything bottoms
+out at `contracts`, the zero-dependency type vocabulary the whole system shares.
+
+```mermaid
+graph TD
+    subgraph apps["apps/ + images/ — executables"]
+        api["api<br/>REST · SSE · triggers"]
+        worker["worker<br/>claim loop · leases"]
+        dashboard["dashboard<br/>live run UI"]
+        runtime["flow-runtime<br/>in-container runner"]
+    end
+    subgraph pkgs["packages/ — libraries"]
+        flowctl["flowctl<br/>deploy / run CLI"]
+        engine["engine<br/>super-step loop"]
+        sdk["sdk<br/>defineFlow · NodeCtx"]
+        storage["storage<br/>Postgres repos"]
+        sandbox["sandbox<br/>Docker executor"]
+        contracts["contracts<br/>shared types"]
+    end
+
+    api --> storage
+    api --> contracts
+    worker --> engine
+    worker --> sandbox
+    worker --> storage
+    worker --> contracts
+    dashboard --> contracts
+    runtime --> sdk
+    runtime --> contracts
+    flowctl --> sdk
+    flowctl --> contracts
+    engine --> sdk
+    engine --> storage
+    engine --> contracts
+    sdk --> contracts
+    storage --> contracts
+    sandbox --> contracts
+```
+
+**Runtime data flow** — the same pieces at run time. The API and worker never call each
+other directly; they coordinate entirely through Postgres (`SKIP LOCKED` claim +
+`LISTEN/NOTIFY` wakeups). The worker drives one Docker container per active run, and node
+code inside it can even call back into the API (as `feature-pipeline` does).
+
+```mermaid
+graph LR
+    dev["developer"] -->|"flowctl deploy / run"| api["api"]
+    extern["external system / cron"] -->|"POST /v1/events"| api
+    api <-->|"read · write · NOTIFY"| pg[("Postgres")]
+    worker["worker"] <-->|"claim · checkpoint · heartbeat"| pg
+    api -->|"SSE run events"| dashboard["dashboard"]
+    worker -->|"create · /execute · destroy"| box["Docker container<br/>(flow-runtime + your bundle)"]
+    box -.->|"orchestrator nodes: POST /v1/runs, poll"| api
+```
+
 ## Pieces
 
 | path | what it is |
