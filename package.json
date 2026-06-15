@@ -11,7 +11,8 @@
     "test": "turbo run test",
     "typecheck": "turbo run typecheck",
     "dev": "turbo run dev",
-    "db:migrate": "pnpm --filter @flow/storage migrate"
+    "db:migrate": "pnpm --filter @flow/storage migrate",
+    "db:reset": "sh scripts/db-reset.sh"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
