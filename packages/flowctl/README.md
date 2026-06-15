@@ -9,7 +9,7 @@ or Docker containers directly (it does invoke the local Docker daemon to *build*
 
 | command | what it does |
 |---|---|
-| `deploy <entry>` | bundle → build image → register manifest(s) |
+| `deploy <entry> [--dockerfile <path>]` | bundle → build image → register manifest(s) |
 | `run <flowId> [--input <json>]` | `POST /v1/runs` and print the new run id |
 | `runs [--flow <id>] [--status <s>]` | list recent runs |
 | `status <runId>` | run status, current step, latest checkpoint |
@@ -27,6 +27,23 @@ or Docker containers directly (it does invoke the local Docker daemon to *build*
    the bundle at `/app/flows/index.mjs`.
 4. **Register** by `POST /v1/deployments` (one per manifest), recording the image ref so
    workers know which image to run for each flow version.
+
+### Custom execution environments (`--dockerfile`)
+
+When a flow needs system tools the base runtime lacks (compilers, CLIs, language runtimes),
+pass `--dockerfile <path>`. That file becomes the build's Dockerfile in place of the default
+`FROM platform/flow-runtime + COPY` — so each flow can have its own environment without one
+shared image accumulating conflicting dependencies:
+
+- It **must** `FROM platform/flow-runtime:latest` (or an image derived from it): the base
+  carries the runner that the container boots into.
+- Declare only the environment (`RUN`, `ENV`, …). flowctl **appends** the bundle
+  `COPY index.mjs /app/flows/index.mjs`; don't add it yourself or override the `ENTRYPOINT`.
+- The Dockerfile content is folded into the image hash, so a dependency change yields a new
+  image and a new flow version (older runs keep resuming on their original image).
+
+See [`examples/cowsay`](../../examples/cowsay) for a flow that installs
+`fortune | cowsay | lolcat` this way.
 
 | source | role |
 |---|---|

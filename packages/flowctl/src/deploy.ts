@@ -10,6 +10,18 @@ import type { FlowManifest } from "@flow/contracts";
 import type { ApiClient } from "./client.js";
 
 const BASE_IMAGE = process.env.FLOW_BASE_IMAGE ?? "platform/flow-runtime:latest";
+const BUNDLE_COPY = "COPY index.mjs /app/flows/index.mjs\n";
+
+export interface DeployOptions {
+  /** Path to a custom Dockerfile that must `FROM platform/flow-runtime`. flowctl appends the bundle COPY. */
+  dockerfile?: string;
+}
+
+/** A custom Dockerfile owns the environment (FROM + deps); flowctl always appends the bundle copy. */
+async function buildDockerfile(options: DeployOptions): Promise<string> {
+  if (!options.dockerfile) return `FROM ${BASE_IMAGE}\n${BUNDLE_COPY}`;
+  return `${(await readFile(resolve(options.dockerfile), "utf8")).trimEnd()}\n${BUNDLE_COPY}`;
+}
 
 async function bundleFlows(entry: string, outDir: string): Promise<string> {
   const outfile = join(outDir, "index.mjs");
@@ -39,7 +51,7 @@ function dockerBuild(contextDir: string, tag: string): Promise<void> {
   });
 }
 
-export async function deploy(entry: string, client: ApiClient): Promise<void> {
+export async function deploy(entry: string, client: ApiClient, options: DeployOptions = {}): Promise<void> {
   const workDir = await mkdtemp(join(tmpdir(), "flowctl-"));
   try {
     console.log(`Bundling ${entry}...`);
@@ -47,13 +59,11 @@ export async function deploy(entry: string, client: ApiClient): Promise<void> {
     const manifests = await extractManifests(bundlePath);
     if (!manifests.length) throw new Error("No flows exported from entry module");
 
-    const bundleHash = createHash("sha256").update(await readFile(bundlePath)).digest("hex").slice(0, 12);
+    const dockerfile = await buildDockerfile(options);
+    const bundleHash = createHash("sha256").update(await readFile(bundlePath)).update(dockerfile).digest("hex").slice(0, 12);
     const imageRef = `flows/${manifests[0]!.id}:${bundleHash}`;
-    await writeFile(
-      join(workDir, "Dockerfile"),
-      `FROM ${BASE_IMAGE}\nCOPY index.mjs /app/flows/index.mjs\n`,
-    );
-    console.log(`Building image ${imageRef}...`);
+    await writeFile(join(workDir, "Dockerfile"), dockerfile);
+    console.log(`Building image ${imageRef}${options.dockerfile ? ` (Dockerfile: ${options.dockerfile})` : ""}...`);
     await dockerBuild(workDir, imageRef);
 
     for (const manifest of manifests) {

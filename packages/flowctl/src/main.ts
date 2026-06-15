@@ -18,7 +18,8 @@ const printJson = (value: unknown) => console.log(JSON.stringify(value, null, 2)
 program
   .command("deploy <entry>")
   .description("Bundle a flow module, build its image, and register the deployment")
-  .action(async (entry: string) => deploy(entry, client()));
+  .option("--dockerfile <path>", "custom Dockerfile for the flow's image (must extend platform/flow-runtime)")
+  .action(async (entry: string, opts: { dockerfile?: string }) => deploy(entry, client(), opts));
 
 program
   .command("run <flowId>")

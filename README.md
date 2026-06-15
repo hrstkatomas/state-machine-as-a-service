@@ -158,6 +158,9 @@ graph LR
 
 `flowctl deploy` bundles your flow with esbuild, builds `flows/<id>:<hash>` from the
 base image, and registers the manifest — workers then run that image for each run.
+For a flow that needs extra system tools, `flowctl deploy --dockerfile <path>` builds from
+your own Dockerfile (which must `FROM platform/flow-runtime`), giving each flow its own
+execution environment — see [`examples/cowsay`](examples/cowsay).
 
 Auth is open by default for local dev; set `FLOW_API_KEY` on the API to require
 `Authorization: Bearer <key>` (flowctl picks it up from the same env var).
