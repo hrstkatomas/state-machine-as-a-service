@@ -25,7 +25,7 @@ visible to the flow's shell command automatically.
 ## Run it
 
 ```sh
-# base image must exist first: pnpm --filter @flow/runtime-image build:image
+# base image must exist first: pnpm build:image
 node packages/flowctl/dist/main.js deploy examples/cowsay/src/index.ts \
   --dockerfile examples/cowsay/Dockerfile
 node packages/flowctl/dist/main.js run cowsay-fortune

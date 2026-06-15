@@ -5,6 +5,10 @@
       "dependsOn": ["^build"],
       "outputs": ["dist/**"]
     },
+    "build:image": {
+      "dependsOn": ["build"],
+      "cache": false
+    },
     "typecheck": {
       "dependsOn": ["^build"]
     },

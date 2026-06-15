@@ -1,4 +1,4 @@
-# flow — state machines as a service
+# State machines as a service
 
 A LangGraph-platform-style flow executor: you define a typed state machine in TypeScript,
 the platform runs it with a checkpoint after every step — so runs can pause for a human,
@@ -14,7 +14,7 @@ pnpm install
 docker compose up -d --wait postgres
 pnpm db:migrate
 pnpm build
-pnpm --filter @flow/runtime-image build:image   # base image for flow containers
+pnpm build:image   # base image for flow containers (bundles runner, then docker build)
 
 # terminal 1 — API (REST + SSE + cron/event triggers), port 4000
 node apps/api/dist/main.js

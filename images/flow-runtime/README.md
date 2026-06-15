@@ -45,5 +45,5 @@ sandbox ──docker run──► container ──HTTP /execute /route /healthz�
 ## Build
 
 ```sh
-pnpm --filter @flow/runtime-image build:image   # bundles runner + docker build -t platform/flow-runtime:latest
+pnpm build:image   # from the repo root: bundles runner (via turbo) + docker build -t platform/flow-runtime:latest
 ```
