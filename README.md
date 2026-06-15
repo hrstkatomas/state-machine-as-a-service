@@ -28,6 +28,13 @@ node packages/flowctl/dist/main.js deploy examples/repo-ci/src/index.ts
 node packages/flowctl/dist/main.js run repo-ci --input '{"repoUrl":"https://github.com/octocat/Hello-World.git","setupCommand":"true","testCommand":"test -f README"}'
 ```
 
+### Inspecting the database
+
+`docker compose up -d` also starts [Adminer](https://www.adminer.org/) on
+[localhost:8080](http://localhost:8080) — a lightweight web UI for the Postgres instance. Pick
+**PostgreSQL** as the system and log in with `flow` / `flow` / `flow` (server is prefilled to
+`postgres`).
+
 ## Defining a flow
 
 ```ts
