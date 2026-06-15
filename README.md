@@ -5,6 +5,8 @@ the platform runs it with a checkpoint after every step — so runs can pause fo
 wait for external events, survive worker crashes, and resume exactly where they stopped.
 Node logic executes in sandboxed Docker containers with a persistent per-run workspace.
 
+![The dashboard's run detail view: live graph, per-step state inspector, and log tail — here the cowsay-fortune example with its ANSI output rendered in color.](docs/dashboard-run.png)
+
 ## Quick start
 
 ```sh
@@ -66,6 +68,11 @@ export default flow;   // or: export const flows = [a, b]
 Node names accumulate as a string-literal union, so edge targets are compile-time checked.
 `ctx.waitForEvent("topic")` pauses until `POST /v1/events/:topic`; use dynamic topics
 (e.g. `` `approval:${id}` ``) for correlation.
+
+When a node calls `ctx.interrupt(payload)` the run pauses and the dashboard renders the
+payload plus a response form; submitting a value resumes the run from that node.
+
+![A paused run waiting on a human: the dashboard shows the interrupt payload from the `review` node and a form to respond with JSON, which resumes the run.](docs/dashboard-interrupt.png)
 
 ### Execution semantics
 
