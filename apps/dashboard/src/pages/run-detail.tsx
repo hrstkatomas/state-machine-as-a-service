@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { api, type Checkpoint, type Interrupt } from "../api.ts";
 import { RunGraph } from "../run-graph.tsx";
-import { Button, Card, JsonView, StatusBadge } from "../ui.tsx";
+import { AnsiText, Button, Card, JsonView, StatusBadge } from "../ui.tsx";
 import { nodeStates, useRunStream } from "../use-run-stream.ts";
 
 export function RunDetailPage({ runId }: { runId: string }) {
@@ -74,8 +74,11 @@ export function RunDetailPage({ runId }: { runId: string }) {
       <Card title={`Logs (${logs.length})`}>
         <pre className="max-h-80 overflow-auto text-xs leading-relaxed">
           {logs.map((log) => (
-            <div key={log.seq} className={log.stream === "stderr" ? "text-red-400" : "text-zinc-300"}>
-              <span className="text-zinc-600">[{log.node}]</span> {log.line}
+            <div
+              key={log.seq}
+              className={log.level === "error" ? "text-red-400" : log.level === "warn" ? "text-amber-400" : "text-zinc-300"}
+            >
+              <span className="text-zinc-600">[{log.node ?? "-"}]</span> <AnsiText text={log.message} />
             </div>
           ))}
           {!logs.length && <span className="text-zinc-500">No logs</span>}
@@ -164,7 +167,13 @@ function StateInspector({ checkpoints }: { checkpoints: Checkpoint[] }) {
             <div className={`text-xs font-semibold ${changedKeys.has(key) ? "text-amber-400" : "text-zinc-400"}`}>
               {key} {changedKeys.has(key) && "● changed"}
             </div>
-            <JsonView value={value} />
+            {typeof value === "string" ? (
+              <pre className="overflow-auto rounded bg-zinc-950 p-2 text-xs leading-relaxed text-zinc-300">
+                <AnsiText text={value} />
+              </pre>
+            ) : (
+              <JsonView value={value} />
+            )}
           </div>
         ))}
       </div>

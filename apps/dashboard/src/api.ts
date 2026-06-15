@@ -66,9 +66,10 @@ export interface Trigger {
 
 export interface RunLog {
   seq: string;
-  node: string;
-  stream: "stdout" | "stderr";
-  line: string;
+  step: number | null;
+  node: string | null;
+  level: "info" | "warn" | "error";
+  message: string;
   at: string;
 }
 

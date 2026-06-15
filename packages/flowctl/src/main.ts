@@ -63,8 +63,8 @@ program
   .command("logs <runId>")
   .description("Print run logs")
   .action(async (runId: string) => {
-    const logs = await client().get<{ node: string; stream: string; line: string }[]>(`/v1/runs/${runId}/logs`);
-    for (const log of logs) console.log(`[${log.node}/${log.stream}] ${log.line}`);
+    const logs = await client().get<{ node: string | null; level: string; message: string }[]>(`/v1/runs/${runId}/logs`);
+    for (const log of logs) console.log(`[${log.node ?? "-"}/${log.level}] ${log.message}`);
   });
 
 program
