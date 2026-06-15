@@ -15,3 +15,4 @@
 - Create docs website
 - Create flow builder like n8n
 - Create hosted version for $
+- Prepare a skill that would instruct agent how to compose a flow. That way user would just describe the flow in plain english.
