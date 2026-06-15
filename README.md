@@ -170,3 +170,8 @@ Auth is open by default for local dev; set `FLOW_API_KEY` on the API to require
 ```sh
 pnpm test   # storage + engine run against flow_test_storage / flow_test_engine
 ```
+
+## License
+
+Source-available under the [Elastic License 2.0](LICENSE) (`Elastic-2.0`) — free to use,
+modify, and self-host; you may not offer it to third parties as a hosted or managed service.
