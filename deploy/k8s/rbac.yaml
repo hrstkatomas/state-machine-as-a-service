@@ -1,0 +1,48 @@
+# Least-privilege identity for a worker that drives runs via the core/v1 API.
+# Namespaced to flow-runs — the worker never needs cluster scope.
+# On Docker Desktop the kubeconfig user is already cluster-admin, so this matters
+# for the in-cluster / prod path (see worker-deployment.yaml), not local dev.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: flow-worker
+  namespace: flow-runs
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: flow-worker
+  namespace: flow-runs
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["create", "get", "list", "watch", "delete"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+  - apiGroups: [""]
+    resources: ["pods/status"]
+    verbs: ["get"]
+  - apiGroups: [""]
+    resources: ["pods/portforward"]
+    verbs: ["create"] # dev-host networking only; unused when the worker runs in-cluster
+  - apiGroups: [""]
+    resources: ["persistentvolumeclaims"]
+    verbs: ["create", "get", "list", "delete"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["get", "list", "watch"] # surface ImagePull / scheduling failures via kubectl
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: flow-worker
+  namespace: flow-runs
+subjects:
+  - kind: ServiceAccount
+    name: flow-worker
+    namespace: flow-runs
+roleRef:
+  kind: Role
+  name: flow-worker
+  apiGroup: rbac.authorization.k8s.io

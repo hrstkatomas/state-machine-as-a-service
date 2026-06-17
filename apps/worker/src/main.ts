@@ -1,7 +1,7 @@
 import { hostname } from "node:os";
 import { randomUUID } from "node:crypto";
 import { driveRun } from "@flow/engine";
-import { DockerExecutor } from "@flow/sandbox";
+import { KubernetesExecutor } from "@flow/sandbox";
 import {
   claimRun,
   createPool,
@@ -23,7 +23,7 @@ const workerId = `${hostname()}-${randomUUID().slice(0, 8)}`;
 const host = process.env.WORKER_HOST ?? hostname();
 const pool = createPool(DATABASE_URL);
 
-const executor = new DockerExecutor({
+const executor = new KubernetesExecutor({
   imageFor: async (flowId, flowVersion) => {
     const flow = await getFlow(pool, flowId, flowVersion);
     if (!flow?.imageRef) throw new Error(`Flow ${flowId}@${flowVersion} has no deployed image`);
@@ -41,7 +41,9 @@ async function processRun(run: RunRow): Promise<void> {
   const controller = new AbortController();
   active.set(run.id, controller);
   log(`claimed run ${run.id} (${run.flowId}@${run.flowVersion}, step ${run.currentStep})`);
-  await setWorkspace(pool, run.id, `ws-${run.id}`, host);
+  // No host pinning under K8s: the kube-scheduler places the Pod (and its PVC), so any worker can
+  // drive or resume any run. Recording a null host keeps claimRun's affinity filter always satisfiable.
+  await setWorkspace(pool, run.id, `ws-${run.id}`, null);
 
   const beat = setInterval(() => {
     void (async () => {

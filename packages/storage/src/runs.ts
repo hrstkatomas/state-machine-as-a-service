@@ -119,7 +119,7 @@ export async function requestCancel(q: Queryable, runId: RunId): Promise<void> {
   await q.query("update runs set cancel_requested = true where id = $1", [runId]);
 }
 
-export async function setWorkspace(q: Queryable, runId: RunId, volume: string, host: string): Promise<void> {
+export async function setWorkspace(q: Queryable, runId: RunId, volume: string, host: string | null): Promise<void> {
   await q.query("update runs set workspace_volume = $2, workspace_host = $3 where id = $1", [runId, volume, host]);
 }
 

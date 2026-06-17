@@ -10,6 +10,8 @@ import type { FlowManifest } from "@flow/contracts";
 import type { ApiClient } from "./client.js";
 
 const BASE_IMAGE = process.env.FLOW_BASE_IMAGE ?? "platform/flow-runtime:latest";
+// Port 5001, not 5000: macOS Control Center's AirPlay Receiver squats on :5000 and swallows pushes.
+const PUSH_REGISTRY = process.env.PUSH_REGISTRY ?? "localhost:5001";
 const BUNDLE_COPY = "COPY index.mjs /app/flows/index.mjs\n";
 
 export interface DeployOptions {
@@ -43,11 +45,11 @@ async function extractManifests(bundlePath: string): Promise<FlowManifest[]> {
   return (mod.flows ?? [mod.default]).map((exported) => resolveFlow(exported).toManifest());
 }
 
-function dockerBuild(contextDir: string, tag: string): Promise<void> {
+function docker(args: string[]): Promise<void> {
   return new Promise((done, fail) => {
-    const proc = spawn("docker", ["build", "-t", tag, contextDir], { stdio: ["ignore", "inherit", "inherit"] });
+    const proc = spawn("docker", args, { stdio: ["ignore", "inherit", "inherit"] });
     proc.on("error", fail);
-    proc.on("exit", (code) => (code === 0 ? done() : fail(new Error(`docker build exited with ${code}`))));
+    proc.on("exit", (code) => (code === 0 ? done() : fail(new Error(`docker ${args[0]} exited with ${code}`))));
   });
 }
 
@@ -61,10 +63,16 @@ export async function deploy(entry: string, client: ApiClient, options: DeployOp
 
     const dockerfile = await buildDockerfile(options);
     const bundleHash = createHash("sha256").update(await readFile(bundlePath)).update(dockerfile).digest("hex").slice(0, 12);
+    // imageRef is the registry-agnostic repo path stored in the DB; the executor prepends its
+    // own registry host (push and pull hostnames differ on Docker Desktop). The unqualified tag
+    // is also built locally so an imagePullPolicy=Never fallback works without a registry.
     const imageRef = `flows/${manifests[0]!.id}:${bundleHash}`;
+    const pushRef = `${PUSH_REGISTRY}/${imageRef}`;
     await writeFile(join(workDir, "Dockerfile"), dockerfile);
-    console.log(`Building image ${imageRef}${options.dockerfile ? ` (Dockerfile: ${options.dockerfile})` : ""}...`);
-    await dockerBuild(workDir, imageRef);
+    console.log(`Building image ${pushRef}${options.dockerfile ? ` (Dockerfile: ${options.dockerfile})` : ""}...`);
+    await docker(["build", "-t", pushRef, "-t", imageRef, workDir]);
+    console.log(`Pushing ${pushRef}...`);
+    await docker(["push", pushRef]);
 
     for (const manifest of manifests) {
       const result = await client.post<{ flowId: string; version: number }>("/v1/deployments", { manifest, imageRef });

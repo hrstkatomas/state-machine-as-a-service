@@ -1,0 +1,7 @@
+# Namespace that holds every per-run Pod and workspace PVC.
+# The executor assumes this exists and fails loud if it doesn't — creating namespaces
+# needs cluster-scoped RBAC the worker deliberately isn't granted.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: flow-runs

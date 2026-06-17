@@ -1,1 +1,1 @@
-export { DockerExecutor, RUN_LABEL, type DockerExecutorDeps } from "./docker-executor.js";
+export { KubernetesExecutor, RUN_LABEL, type KubernetesExecutorDeps } from "./kubernetes-executor.js";

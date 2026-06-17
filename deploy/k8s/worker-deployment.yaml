@@ -1,0 +1,31 @@
+# OPTIONAL — runs the worker in-cluster (the Pod-IP networking path).
+# Requires a worker image you build and push yourself; this repo has no worker-image
+# build, so the `image:` below is a placeholder. Running the worker on your host instead
+# (pnpm --filter @flow/worker dev) is fully supported and auto-selects port-forwarding.
+#
+# In-cluster, KUBERNETES_SERVICE_HOST is set, so the executor loads the mounted
+# ServiceAccount token and reaches each run Pod directly by Pod IP — no port-forward.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: flow-worker
+  namespace: flow-runs
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: flow-worker }
+  template:
+    metadata:
+      labels: { app: flow-worker }
+    spec:
+      serviceAccountName: flow-worker
+      containers:
+        - name: worker
+          image: flow-worker:latest # replace with your pushed worker image
+          env:
+            - name: DATABASE_URL
+              value: postgres://flow:flow@postgres.flow-runs.svc:5432/flow
+            - name: FLOW_NAMESPACE
+              value: flow-runs
+            - name: FLOW_REGISTRY
+              value: registry.flow-runs.svc:5000 # registry the kubelet pulls run images from

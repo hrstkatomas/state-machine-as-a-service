@@ -25,6 +25,11 @@ export const RUNNER_PORT = 8088;
 export interface SandboxLimits {
   cpus: number;
   memoryMb: number;
+  /**
+   * Max process count. The Docker executor enforced this per-container; Kubernetes has no per-Pod
+   * field for it (it's the kubelet-level `--pod-max-pids`), so the K8s executor ignores it and relies
+   * on the memory limit + OOMKill as the fork-bomb backstop. Kept here for the local/in-process path.
+   */
   pidsLimit: number;
 }
 

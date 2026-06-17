@@ -36,7 +36,7 @@ const reply = (res: ServerResponse, status: number, payload: unknown) => {
 const flows = await loadFlows();
 const flowOrNull = (flowId: string) => flows.get(flowId) ?? null;
 
-createServer(async (req, res) => {
+const server = createServer(async (req, res) => {
   try {
     if (req.method === "GET" && req.url === "/healthz") return reply(res, 200, { ok: true, flows: [...flows.keys()] });
     if (req.method === "POST" && req.url === "/execute") {
@@ -60,6 +60,12 @@ createServer(async (req, res) => {
   } catch (error) {
     reply(res, 500, { error: error instanceof Error ? error.message : String(error) });
   }
-}).listen(RUNNER_PORT, () => {
+});
+
+server.listen(RUNNER_PORT, () => {
   emitLog({ level: "info", message: `Runner listening on :${RUNNER_PORT}`, at: new Date().toISOString() });
 });
+
+// The executor deletes the Pod on every pause; the runner holds no shutdown state, so exit
+// immediately on SIGTERM instead of waiting out the termination grace period.
+process.on("SIGTERM", () => server.close(() => process.exit(0)));

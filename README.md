@@ -3,30 +3,55 @@
 A LangGraph-platform-style flow executor: you define a typed state machine in TypeScript,
 the platform runs it with a checkpoint after every step — so runs can pause for a human,
 wait for external events, survive worker crashes, and resume exactly where they stopped.
-Node logic executes in sandboxed Docker containers with a persistent per-run workspace.
+Node logic executes in a sandboxed Kubernetes Pod per run, pulling the flow's image from a
+registry, with a persistent per-run workspace (a PVC) that survives pauses and resumes.
 
 ![The dashboard's run detail view: live graph, per-step state inspector, and log tail — here the cowsay-fortune example with its ANSI output rendered in color.](docs/dashboard-run.png)
 
 ## Quick start
 
+Runs execute as Kubernetes Pods, so you need a cluster. Locally, enable **Docker Desktop →
+Settings → Kubernetes**; the steps below use it plus a local registry from `docker compose`.
+
 ```sh
 pnpm install
-docker compose up -d --wait postgres
+docker compose up -d --wait postgres registry   # Postgres + a registry:2 on :5001
 pnpm db:migrate
 pnpm build
-pnpm build:image   # base image for flow containers (bundles runner, then docker build)
+pnpm build:image   # base image for flow pods (bundles runner, then docker build)
+
+kubectl apply -f deploy/k8s/namespace.yaml   # the flow-runs namespace (pods + PVCs live here)
 
 # terminal 1 — API (REST + SSE + cron/event triggers), port 4000
 node apps/api/dist/main.js
-# terminal 2 — worker (claims runs, drives containers)
-node apps/worker/dist/main.js
+# terminal 2 — worker (claims runs, drives run Pods). FLOW_REGISTRY is the *pull* host:
+# Docker Desktop's kubelet can't see the host's localhost, so it pulls via host.docker.internal.
+FLOW_REGISTRY=host.docker.internal:5001 node apps/worker/dist/main.js
 # terminal 3 — dashboard, port 5173
 pnpm --filter @flow/dashboard dev
 
-# deploy an example and start a run
+# deploy an example (builds + pushes the image to localhost:5001) and start a run
 node packages/flowctl/dist/main.js deploy examples/repo-ci/src/index.ts
 node packages/flowctl/dist/main.js run repo-ci --input '{"repoUrl":"https://github.com/octocat/Hello-World.git","setupCommand":"true","testCommand":"test -f README"}'
 ```
+
+> **Why :5001, not :5000?** On macOS the Control Center **AirPlay Receiver** listens on
+> `:5000` (`Server: AirTunes/...`) and silently swallows `docker push` — layers hang on
+> `Waiting` forever. The registry is published on `5001` to dodge it. (Alternatively turn
+> AirPlay Receiver off under System Settings → General → AirDrop & Handoff and use `5000`.)
+>
+> **Registry over plain HTTP.** `flowctl` pushes to `localhost:5001` while the kubelet pulls
+> from `host.docker.internal:5001` — the same registry under two names. `localhost` is treated
+> as insecure by default, but the pull host is not: add it to Docker Desktop → Settings →
+> Docker Engine `"insecure-registries"` so the daemon allows HTTP:
+> `"insecure-registries": ["host.docker.internal:5001"]`.
+>
+> Override hosts with `PUSH_REGISTRY` (flowctl, default `localhost:5001`) and `FLOW_REGISTRY`
+> (worker, the pull prefix). **Escape hatch:** Docker Desktop's K8s shares the host image store,
+> so a locally-built tag works with `FLOW_IMAGE_PULL_POLICY=Never` and no registry at all.
+
+To run the worker **in-cluster** instead (it then reaches Pods by IP, no port-forward), apply
+`deploy/k8s/rbac.yaml` and see `deploy/k8s/worker-deployment.yaml`.
 
 ### Inspecting the database
 
@@ -116,7 +141,7 @@ graph TD
         engine["engine<br/>super-step loop"]
         sdk["sdk<br/>defineFlow · NodeCtx"]
         storage["storage<br/>Postgres repos"]
-        sandbox["sandbox<br/>Docker executor"]
+        sandbox["sandbox<br/>Kubernetes executor"]
         contracts["contracts<br/>shared types"]
     end
 
@@ -141,17 +166,19 @@ graph TD
 
 **Runtime data flow** — the same pieces at run time. The API and worker never call each
 other directly; they coordinate entirely through Postgres (`SKIP LOCKED` claim +
-`LISTEN/NOTIFY` wakeups). The worker drives one Docker container per active run, and node
-code inside it can even call back into the API (as `feature-pipeline` does).
+`LISTEN/NOTIFY` wakeups). The worker drives one Kubernetes Pod per active run via the
+core/v1 API, and node code inside it can even call back into the API (as `feature-pipeline` does).
 
 ```mermaid
 graph LR
-    dev["developer"] -->|"flowctl deploy / run"| api["api"]
+    dev["developer"] -->|"flowctl deploy (push image) / run"| api["api"]
+    dev -->|"docker push"| reg[("registry")]
     extern["external system / cron"] -->|"POST /v1/events"| api
     api <-->|"read · write · NOTIFY"| pg[("Postgres")]
     worker["worker"] <-->|"claim · checkpoint · heartbeat"| pg
     api -->|"SSE run events"| dashboard["dashboard"]
-    worker -->|"create · /execute · destroy"| box["Docker container<br/>(flow-runtime + your bundle)"]
+    worker -->|"create Pod · /execute · delete"| box["Kubernetes Pod<br/>(flow-runtime + your bundle)"]
+    box -.->|"pull image"| reg
     box -.->|"orchestrator nodes: POST /v1/runs, poll"| api
 ```
 
@@ -163,18 +190,20 @@ graph LR
 | `packages/sdk` | `defineFlow`, channels, `NodeCtx` — what user code imports |
 | `packages/storage` | Postgres repos, migrations, SKIP LOCKED claim + LISTEN/NOTIFY |
 | `packages/engine` | the super-step run loop |
-| `packages/sandbox` | Docker executor: one container per active run, `ws-<runId>` volume |
+| `packages/sandbox` | Kubernetes executor: one Pod per active run, `ws-<runId>` PVC |
 | `packages/flowctl` | CLI: `deploy`, `run`, `runs`, `status`, `logs`, `respond`, `event` |
 | `apps/api` | Fastify REST + SSE streams + cron/event trigger dispatch |
-| `apps/worker` | claims runs, heartbeats leases, drives containers |
+| `apps/worker` | claims runs, heartbeats leases, drives run Pods |
 | `apps/dashboard` | live run graph, checkpoint/state inspector, interrupt forms |
 | `images/flow-runtime` | base image; `flowctl deploy` layers your bundle on top |
+| `deploy/k8s` | namespace, worker RBAC, optional in-cluster worker Deployment |
 
-`flowctl deploy` bundles your flow with esbuild, builds `flows/<id>:<hash>` from the
-base image, and registers the manifest — workers then run that image for each run.
-For a flow that needs extra system tools, `flowctl deploy --dockerfile <path>` builds from
-your own Dockerfile (which must `FROM platform/flow-runtime`), giving each flow its own
-execution environment — see [`examples/cowsay`](examples/cowsay).
+`flowctl deploy` bundles your flow with esbuild, builds `flows/<id>:<hash>` from the base
+image, **pushes it to the registry**, and registers the manifest (storing the unqualified
+image ref) — workers then pull and run that image for each run. For a flow that needs extra
+system tools, `flowctl deploy --dockerfile <path>` builds from your own Dockerfile (which must
+`FROM platform/flow-runtime`), giving each flow its own execution environment — see
+[`examples/cowsay`](examples/cowsay).
 
 Auth is open by default for local dev; set `FLOW_API_KEY` on the API to require
 `Authorization: Bearer <key>` (flowctl picks it up from the same env var).

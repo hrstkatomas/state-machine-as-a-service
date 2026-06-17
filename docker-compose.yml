@@ -25,5 +25,15 @@ services:
     depends_on:
       - postgres
 
+  registry:
+    image: registry:2
+    # Host port 5001, not 5000: on macOS the Control Center AirPlay Receiver squats on :5000
+    # and silently swallows pushes. The registry still listens on 5000 inside the container.
+    ports:
+      - "5001:5000"
+    volumes:
+      - registrydata:/var/lib/registry
+
 volumes:
   pgdata:
+  registrydata:
